@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id           String         @id @default(cuid())
+  name         String
+  email        String         @unique
+  passwordHash String
+  role         String         @default("admin")
+  status       String         @default("active")
+  mustChangePassword Boolean  @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lastLogin    DateTime?
+  activityLogs ActivityLog[]
+}
+
+model Category {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String      @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  portfolios  Portfolio[]
+}
+
+model Portfolio {
+  id               String          @id @default(cuid())
+  categoryId       String
+  title            String
+  slug             String          @unique
+  shortDescription String
+  fullDescription  String
+  thumbnail        String?
+  technologies     String          @default("[]")
+  extraCategories  String          @default("[]")
+  demoUrl          String?
+  githubUrl        String?
+  startDate        DateTime?
+  completionDate   DateTime?
+  status           String          @default("draft")
+  allowDownload    Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  category         Category        @relation(fields: [categoryId], references: [id])
+  files            PortfolioFile[]
+}
+
+model PortfolioFile {
+  id            String    @id @default(cuid())
+  portfolioId   String
+  fileName      String
+  fileUrl       String
+  fileType      String
+  fileSize      Int
+  allowDownload Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  portfolio     Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
+  description String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model SiteSettings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
