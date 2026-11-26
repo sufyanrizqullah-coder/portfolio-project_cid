@@ -1,10 +1,15 @@
 import { NextRequest } from 'next/server'
 import { requireAdmin } from '@/lib/auth'
 import { apiError, apiResponse } from '@/lib/utils'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
 import { prisma } from '@/lib/prisma'
 import { logActivity } from '@/lib/activity'
+import { v2 as cloudinary } from 'cloudinary'
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
 const ALLOWED_DOC_TYPES = ['application/pdf', 'application/zip', 'application/x-zip-compressed']
@@ -28,15 +33,23 @@ export async function POST(req: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    const ext = path.extname(file.name)
-    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads')
-    await mkdir(uploadDir, { recursive: true })
+    // Upload ke Cloudinary
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type)
+    const uploadResult = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'portfolio',
+          resource_type: isImage ? 'image' : 'raw',
+        },
+        (error, result) => {
+          if (error) reject(error)
+          else resolve(result)
+        }
+      )
+      uploadStream.end(buffer)
+    })
 
-    const filePath = path.join(uploadDir, safeName)
-    await writeFile(filePath, buffer)
-
-    const fileUrl = `/uploads/${safeName}`
+    const fileUrl = uploadResult.secure_url
 
     // Kalau ada portfolioId, simpan ke tabel portfolio_files
     if (portfolioId) {
